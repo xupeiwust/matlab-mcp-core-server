@@ -8,6 +8,7 @@ import (
 
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/definition"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/mcp/tools"
+	"github.com/matlab/matlab-mcp-core-server/internal/entities"
 	"github.com/matlab/matlab-mcp-core-server/internal/messages"
 	internaltoolsmocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/mcp/tools"
 	entitiesmocks "github.com/matlab/matlab-mcp-core-server/mocks/entities"
@@ -44,7 +45,7 @@ func TestServer_StartAndWaitForCompletion_HappyPath(t *testing.T) {
 	defer mockModeSelector.AssertExpectations(t)
 
 	ctx := t.Context()
-	expectedDefinition := definition.New("test-server", "Test Server", "Test instructions", nil, nil)
+	expectedDefinition := definition.New("test-server", "Test Server", "Test instructions", nil, nil, nil)
 
 	mockApplicationFactory.EXPECT().
 		New(matchDefinition(expectedDefinition, definition.DependenciesProviderResources{}, definition.ToolsProviderResources{})).
@@ -97,7 +98,7 @@ func TestServer_StartAndWaitForCompletion_KnownError(t *testing.T) {
 	expectedError := errors.New("known error")
 	expectedErrorMessage := "A known error occurred"
 
-	expectedDefinition := definition.New("test-server", "Test Server", "Test instructions", nil, nil)
+	expectedDefinition := definition.New("test-server", "Test Server", "Test instructions", nil, nil, nil)
 
 	mockApplicationFactory.EXPECT().
 		New(matchDefinition(expectedDefinition, definition.DependenciesProviderResources{}, definition.ToolsProviderResources{})).
@@ -166,7 +167,7 @@ func TestServer_StartAndWaitForCompletion_UnknownError(t *testing.T) {
 	expectedError := errors.New("unknown error")
 	expectedFallbackMessage := "Some generic failure message."
 	expectedWrittenOutput := expectedFallbackMessage + "\n"
-	expectedDefinition := definition.New("test-server", "Test Server", "Test instructions", nil, nil)
+	expectedDefinition := definition.New("test-server", "Test Server", "Test instructions", nil, nil, nil)
 
 	mockApplicationFactory.EXPECT().
 		New(matchDefinition(expectedDefinition, definition.DependenciesProviderResources{}, definition.ToolsProviderResources{})).
@@ -219,6 +220,168 @@ func TestServer_StartAndWaitForCompletion_UnknownError(t *testing.T) {
 	require.Equal(t, 1, exitCode)
 }
 
+func TestServer_StartAndWaitForCompletion_WithParameters(t *testing.T) {
+	// Arrange
+	mockApplicationFactory := &adaptormocks.MockApplicationFactory{}
+	defer mockApplicationFactory.AssertExpectations(t)
+
+	mockApplication := &adaptormocks.MockApplication{}
+	defer mockApplication.AssertExpectations(t)
+
+	mockModeSelector := &adaptormocks.MockModeSelector{}
+	defer mockModeSelector.AssertExpectations(t)
+
+	mockParameter := &entitiesmocks.MockParameter{}
+	defer mockParameter.AssertExpectations(t)
+
+	ctx := t.Context()
+	expectedName := "test-server"
+	expectedTitle := "Test Server"
+	expectedInstructions := "Test instructions"
+	expectedDefinition := definition.New(expectedName, expectedTitle, expectedInstructions, []entities.Parameter{mockParameter}, nil, nil)
+
+	mockApplicationFactory.EXPECT().
+		New(matchDefinition(expectedDefinition, definition.DependenciesProviderResources{}, definition.ToolsProviderResources{})).
+		Return(mockApplication).
+		Once()
+
+	mockApplication.EXPECT().
+		ModeSelector().
+		Return(mockModeSelector).
+		Once()
+
+	mockModeSelector.EXPECT().
+		StartAndWaitForCompletion(ctx).
+		Return(nil).
+		Once()
+
+	serverDefinition := server.Definition[struct{}]{
+		Name:         expectedName,
+		Title:        expectedTitle,
+		Instructions: expectedInstructions,
+		Parameters:   []server.Parameter{mockParameter},
+	}
+	s := server.New(serverDefinition)
+	s.SetApplicationFactory(mockApplicationFactory)
+
+	// Act
+	exitCode := s.StartAndWaitForCompletion(ctx)
+
+	// Assert
+	require.Equal(t, 0, exitCode)
+}
+
+func TestServer_StartAndWaitForCompletion_ClonesParametersToPreventMutation(t *testing.T) {
+	// Arrange
+	mockApplicationFactory := &adaptormocks.MockApplicationFactory{}
+	defer mockApplicationFactory.AssertExpectations(t)
+
+	mockApplication := &adaptormocks.MockApplication{}
+	defer mockApplication.AssertExpectations(t)
+
+	mockModeSelector := &adaptormocks.MockModeSelector{}
+	defer mockModeSelector.AssertExpectations(t)
+
+	mockParameter := &entitiesmocks.MockParameter{}
+	defer mockParameter.AssertExpectations(t)
+
+	secondMockParameter := &entitiesmocks.MockParameter{}
+	defer secondMockParameter.AssertExpectations(t)
+
+	ctx := t.Context()
+	expectedName := "test-server"
+	expectedTitle := "Test Server"
+	expectedInstructions := "Test instructions"
+	expectedDefinition := definition.New(expectedName, expectedTitle, expectedInstructions, []entities.Parameter{mockParameter}, nil, nil)
+
+	mockApplicationFactory.EXPECT().
+		New(matchDefinition(expectedDefinition, definition.DependenciesProviderResources{}, definition.ToolsProviderResources{})).
+		Return(mockApplication).
+		Once()
+
+	mockApplication.EXPECT().
+		ModeSelector().
+		Return(mockModeSelector).
+		Once()
+
+	mockModeSelector.EXPECT().
+		StartAndWaitForCompletion(ctx).
+		Return(nil).
+		Once()
+
+	parameters := []server.Parameter{mockParameter}
+
+	serverDefinition := server.Definition[struct{}]{
+		Name:         expectedName,
+		Title:        expectedTitle,
+		Instructions: expectedInstructions,
+		Parameters:   parameters,
+	}
+	s := server.New(serverDefinition)
+	s.SetApplicationFactory(mockApplicationFactory)
+
+	// Act
+	parameters[0] = secondMockParameter
+	exitCode := s.StartAndWaitForCompletion(ctx)
+
+	// Assert
+	require.Equal(t, 0, exitCode)
+}
+
+func TestServer_StartAndWaitForCompletion_NilToolsProvider(t *testing.T) {
+	// Arrange
+	mockApplicationFactory := &adaptormocks.MockApplicationFactory{}
+	defer mockApplicationFactory.AssertExpectations(t)
+
+	mockApplication := &adaptormocks.MockApplication{}
+	defer mockApplication.AssertExpectations(t)
+
+	mockModeSelector := &adaptormocks.MockModeSelector{}
+	defer mockModeSelector.AssertExpectations(t)
+
+	ctx := t.Context()
+
+	type TestDependencies struct{}
+	expectedDependencies := &TestDependencies{}
+
+	expectedDefinition := definition.New("test-server", "Test Server", "Test instructions", nil,
+		func(resources definition.DependenciesProviderResources) (any, error) {
+			return expectedDependencies, nil
+		}, nil)
+
+	mockApplicationFactory.EXPECT().
+		New(matchDefinition(expectedDefinition, definition.DependenciesProviderResources{}, definition.ToolsProviderResources{})).
+		Return(mockApplication).
+		Once()
+
+	mockApplication.EXPECT().
+		ModeSelector().
+		Return(mockModeSelector).
+		Once()
+
+	mockModeSelector.EXPECT().
+		StartAndWaitForCompletion(ctx).
+		Return(nil).
+		Once()
+
+	serverDefinition := server.Definition[*TestDependencies]{
+		Name:         expectedDefinition.Name(),
+		Title:        expectedDefinition.Title(),
+		Instructions: expectedDefinition.Instructions(),
+		DependenciesProvider: func(resources server.DependenciesProviderResources) (*TestDependencies, error) {
+			return expectedDependencies, nil
+		},
+	}
+	s := server.New(serverDefinition)
+	s.SetApplicationFactory(mockApplicationFactory)
+
+	// Act
+	exitCode := s.StartAndWaitForCompletion(ctx)
+
+	// Assert
+	require.Equal(t, 0, exitCode)
+}
+
 func TestServer_StartAndWaitForCompletion_WithDependenciesProvider(t *testing.T) {
 	// Arrange
 	mockApplicationFactory := &adaptormocks.MockApplicationFactory{}
@@ -235,7 +398,7 @@ func TestServer_StartAndWaitForCompletion_WithDependenciesProvider(t *testing.T)
 	type TestDependencies struct{}
 	expectedDependencies := &TestDependencies{}
 
-	expectedDefinition := definition.New("test-server", "Test Server", "Test instructions",
+	expectedDefinition := definition.New("test-server", "Test Server", "Test instructions", nil,
 		func(resources definition.DependenciesProviderResources) (any, error) {
 			return expectedDependencies, nil
 		}, nil)
@@ -299,11 +462,13 @@ func TestServer_StartAndWaitForCompletion_WithToolsProvider(t *testing.T) {
 		LoggerFactory: mockLoggerFactory,
 	}
 
-	expectedDefinition := definition.New("test-server", "Test Server", "Test instructions", nil, func(resources definition.ToolsProviderResources) []tools.Tool {
-		return []tools.Tool{
-			mockInternalTool,
-		}
-	})
+	expectedDefinition := definition.New("test-server", "Test Server", "Test instructions", nil, nil,
+		func(resources definition.ToolsProviderResources) []tools.Tool {
+			return []tools.Tool{
+				mockInternalTool,
+			}
+		},
+	)
 
 	mockApplicationFactory.EXPECT().
 		New(matchDefinition(expectedDefinition, definition.DependenciesProviderResources{}, internalToolProviderResources)).
@@ -348,6 +513,19 @@ func matchDefinition(expected definition.Definition, dependenciesResources defin
 			d.Title() != expected.Title() ||
 			d.Instructions() != expected.Instructions() {
 			return false
+		}
+
+		expectedParameters := expected.Parameters()
+		parameters := d.Parameters()
+
+		if len(expectedParameters) != len(parameters) {
+			return false
+		}
+
+		for i, expectedParameter := range expectedParameters {
+			if expectedParameter != parameters[i] {
+				return false
+			}
 		}
 
 		expectedDependencies, expectedDepsErr := expected.Dependencies(dependenciesResources)

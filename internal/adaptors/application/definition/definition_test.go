@@ -7,16 +7,18 @@ import (
 
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/definition"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/mcp/tools"
+	"github.com/matlab/matlab-mcp-core-server/internal/entities"
 	"github.com/matlab/matlab-mcp-core-server/internal/testutils"
 	toolsmocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/mcp/tools"
 	basetoolmocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/mcp/tools/basetool"
+	entitiesmocks "github.com/matlab/matlab-mcp-core-server/mocks/entities"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDefinition_Name_HappyPath(t *testing.T) {
 	// Arrange
 	expectedName := "my-definition"
-	def := definition.New(expectedName, "", "", nil, nil)
+	def := definition.New(expectedName, "", "", nil, nil, nil)
 
 	// Act
 	result := def.Name()
@@ -28,7 +30,7 @@ func TestDefinition_Name_HappyPath(t *testing.T) {
 func TestDefinition_Title_HappyPath(t *testing.T) {
 	// Arrange
 	expectedTitle := "My Definition Title"
-	def := definition.New("", expectedTitle, "", nil, nil)
+	def := definition.New("", expectedTitle, "", nil, nil, nil)
 
 	// Act
 	result := def.Title()
@@ -40,13 +42,54 @@ func TestDefinition_Title_HappyPath(t *testing.T) {
 func TestDefinition_Instructions_HappyPath(t *testing.T) {
 	// Arrange
 	expectedInstructions := "These are the instructions"
-	def := definition.New("", "", expectedInstructions, nil, nil)
+	def := definition.New("", "", expectedInstructions, nil, nil, nil)
 
 	// Act
 	result := def.Instructions()
 
 	// Assert
 	require.Equal(t, expectedInstructions, result)
+}
+
+func TestDefinition_Parameters_HappyPath(t *testing.T) {
+	// Arrange
+	mockParam1 := &entitiesmocks.MockParameter{}
+	defer mockParam1.AssertExpectations(t)
+
+	mockParam2 := &entitiesmocks.MockParameter{}
+	defer mockParam2.AssertExpectations(t)
+
+	expectedParameters := []entities.Parameter{mockParam1, mockParam2}
+	def := definition.New("", "", "", expectedParameters, nil, nil)
+
+	// Act
+	result := def.Parameters()
+
+	// Assert
+	require.Equal(t, expectedParameters, result)
+}
+
+func TestDefinition_Parameters_EmptySlice(t *testing.T) {
+	// Arrange
+	expectedParameters := []entities.Parameter{}
+	def := definition.New("", "", "", expectedParameters, nil, nil)
+
+	// Act
+	result := def.Parameters()
+
+	// Assert
+	require.Equal(t, expectedParameters, result)
+}
+
+func TestDefinition_Parameters_Nil(t *testing.T) {
+	// Arrange
+	def := definition.New("", "", "", nil, nil, nil)
+
+	// Act
+	result := def.Parameters()
+
+	// Assert
+	require.Nil(t, result)
 }
 
 func TestDefinition_Dependencies_HappyPath(t *testing.T) {
@@ -63,7 +106,7 @@ func TestDefinition_Dependencies_HappyPath(t *testing.T) {
 		return expectedDependencies, nil
 	}
 
-	def := definition.New("", "", "", dependenciesProvider, nil)
+	def := definition.New("", "", "", nil, dependenciesProvider, nil)
 
 	// Act
 	result, err := def.Dependencies(expectedResources)
@@ -80,7 +123,7 @@ func TestDefinition_Dependencies_NilProvider(t *testing.T) {
 	expectedResources := definition.DependenciesProviderResources{
 		Logger: mockLogger,
 	}
-	def := definition.New("", "", "", nil, nil)
+	def := definition.New("", "", "", nil, nil, nil)
 
 	// Act
 	result, err := def.Dependencies(expectedResources)
@@ -108,7 +151,7 @@ func TestDefinition_Tools_HappyPath(t *testing.T) {
 		return expectedTools
 	}
 
-	def := definition.New("", "", "", nil, toolsProvider)
+	def := definition.New("", "", "", nil, nil, toolsProvider)
 
 	// Act
 	result := def.Tools(expectedResources)
@@ -120,7 +163,7 @@ func TestDefinition_Tools_HappyPath(t *testing.T) {
 func TestDefinition_Tools_NilProvider(t *testing.T) {
 	// Arrange
 	expectedResources := definition.ToolsProviderResources{}
-	def := definition.New("", "", "", nil, nil)
+	def := definition.New("", "", "", nil, nil, nil)
 
 	// Act
 	result := def.Tools(expectedResources)

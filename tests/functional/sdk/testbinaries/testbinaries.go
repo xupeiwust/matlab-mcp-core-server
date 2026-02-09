@@ -38,6 +38,19 @@ func BuildEmptyServer(t *testing.T) ServerDetails {
 	}
 }
 
+func BuildServerWithCustomParameters(t *testing.T) ServerDetails {
+	// Those string literals match the one in the source code
+	return ServerDetails{
+		binaryLocation: buildSDKServer(t, "server_with_custom_parameters"),
+
+		moduleName: goModName,
+
+		name:         "server-with-custom-parameters",
+		title:        "Server With Custom Parameters",
+		instructions: "This is a test server with custom parameters",
+	}
+}
+
 func BuildServerWithCustomTools(t *testing.T) ServerDetails {
 	// Those string literals match the one in the source code
 	return ServerDetails{

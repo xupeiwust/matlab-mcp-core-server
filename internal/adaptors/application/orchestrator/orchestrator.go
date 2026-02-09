@@ -15,6 +15,10 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+type MessageCatalog interface {
+	GetFromError(err messages.Error) string
+}
+
 type LifecycleSignaler interface {
 	RequestShutdown()
 	WaitForShutdownToComplete() error
@@ -57,6 +61,7 @@ type DirectoryFactory interface {
 
 // Orchestrator
 type Orchestrator struct {
+	messageCatalog        MessageCatalog
 	lifecycleSignaler     LifecycleSignaler
 	applicationDefinition ApplicationDefinition
 	configFactory         ConfigFactory
@@ -69,6 +74,7 @@ type Orchestrator struct {
 }
 
 func New(
+	messageCatalog MessageCatalog,
 	lifecycleSignaler LifecycleSignaler,
 	applicationDefinition ApplicationDefinition,
 	configFactory ConfigFactory,
@@ -80,6 +86,7 @@ func New(
 	directoryFactory DirectoryFactory,
 ) *Orchestrator {
 	orchestrator := &Orchestrator{
+		messageCatalog:        messageCatalog,
 		lifecycleSignaler:     lifecycleSignaler,
 		applicationDefinition: applicationDefinition,
 		configFactory:         configFactory,
@@ -139,6 +146,8 @@ func (o *Orchestrator) StartAndWaitForCompletion(ctx context.Context) error {
 	logger.Debug("Building SDK dependencies")
 	dependencies, err := o.applicationDefinition.Dependencies(definition.NewDependenciesProviderResources(
 		logger,
+		config,
+		o.messageCatalog,
 	))
 	if err != nil {
 		return err
@@ -147,6 +156,8 @@ func (o *Orchestrator) StartAndWaitForCompletion(ctx context.Context) error {
 	logger.Debug("Building SDK tools")
 	tools := o.applicationDefinition.Tools(definition.NewToolsProviderResources(
 		logger,
+		config,
+		o.messageCatalog,
 		dependencies,
 		o.loggerFactory,
 	))

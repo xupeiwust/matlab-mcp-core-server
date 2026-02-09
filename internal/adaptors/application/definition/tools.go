@@ -3,13 +3,17 @@
 package definition
 
 import (
+	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/config"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/mcp/tools"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/mcp/tools/basetool"
 	"github.com/matlab/matlab-mcp-core-server/internal/entities"
 )
 
 type ToolsProviderResources struct {
-	Logger       entities.Logger
+	Logger         entities.Logger
+	Config         config.GenericConfig
+	MessageCatalog MessageCatalog
+
 	Dependencies any
 
 	// We're forced to do this, because we can't deps inject in basetool, due to generics in golang MCP SDK
@@ -18,9 +22,18 @@ type ToolsProviderResources struct {
 
 type ToolsProvider func(resources ToolsProviderResources) []tools.Tool
 
-func NewToolsProviderResources(logger entities.Logger, dependencies any, loggerFactory basetool.LoggerFactory) ToolsProviderResources {
+func NewToolsProviderResources(
+	logger entities.Logger,
+	config config.GenericConfig,
+	messageCatalog MessageCatalog,
+	dependencies any,
+	loggerFactory basetool.LoggerFactory,
+) ToolsProviderResources {
 	return ToolsProviderResources{
-		Logger:       logger,
+		Logger:         logger,
+		Config:         config,
+		MessageCatalog: messageCatalog,
+
 		Dependencies: dependencies,
 
 		LoggerFactory: loggerFactory,

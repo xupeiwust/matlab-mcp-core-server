@@ -9,23 +9,44 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+// syncBuffer is a thread-safe wrapper around bytes.Buffer
+type syncBuffer struct {
+	lock        sync.Mutex
+	innerBuffer bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (n int, err error) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	return b.innerBuffer.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	return b.innerBuffer.String()
+}
 
 // MCPClient wraps MCP session with helper methods
 // Lifecycle: NewClient -> CreateSession -> [operations] -> Close
 type MCPClient struct {
 	client    *mcp.Client
 	transport *mcp.CommandTransport
-	stderr    *bytes.Buffer
+	stderr    *syncBuffer
 }
 
 // MCPClientSession represents an active MCP session
 type MCPClientSession struct {
 	session *mcp.ClientSession
-	stderr  *bytes.Buffer
+	stderr  *syncBuffer
 }
 
 func GetMCPClientImplementation() *mcp.Implementation {
@@ -39,7 +60,7 @@ func GetMCPClientImplementation() *mcp.Implementation {
 // NewClient creates a new MCP client
 func NewClient(ctx context.Context, serverPath string, env []string, args ...string) *MCPClient {
 	cmd := exec.CommandContext(ctx, serverPath, args...)
-	stderr := &bytes.Buffer{}
+	stderr := &syncBuffer{}
 	cmd.Stderr = stderr
 	if env != nil {
 		cmd.Env = env

@@ -4,12 +4,20 @@ package definition
 
 import (
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/mcp/tools"
+	"github.com/matlab/matlab-mcp-core-server/internal/entities"
+	"github.com/matlab/matlab-mcp-core-server/internal/messages"
 )
+
+type MessageCatalog interface {
+	GetFromError(err messages.Error) string
+}
 
 type Definition struct {
 	name         string
 	title        string
 	instructions string
+
+	parameters []entities.Parameter
 
 	dependenciesProvider DependenciesProvider
 
@@ -20,6 +28,7 @@ func New(
 	name string,
 	title string,
 	instructions string,
+	parameters []entities.Parameter,
 	dependenciesProvider DependenciesProvider,
 	toolsProvider ToolsProvider,
 ) Definition {
@@ -27,6 +36,8 @@ func New(
 		name:         name,
 		title:        title,
 		instructions: instructions,
+
+		parameters: parameters,
 
 		dependenciesProvider: dependenciesProvider,
 
@@ -44,6 +55,10 @@ func (d Definition) Title() string {
 
 func (d Definition) Instructions() string {
 	return d.instructions
+}
+
+func (d Definition) Parameters() []entities.Parameter {
+	return d.parameters
 }
 
 func (d Definition) Dependencies(resources DependenciesProviderResources) (any, error) {

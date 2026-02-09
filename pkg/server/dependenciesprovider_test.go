@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/definition"
+	configmocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/application/config"
+	definitionmocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/application/definition"
 	entitiesmocks "github.com/matlab/matlab-mcp-core-server/mocks/entities"
 	"github.com/matlab/matlab-mcp-core-server/pkg/server"
 	"github.com/stretchr/testify/assert"
@@ -17,10 +19,23 @@ func TestDependenciesProvider_toInternal_HappyPath(t *testing.T) {
 	mockLogger := &entitiesmocks.MockLogger{}
 	defer mockLogger.AssertExpectations(t)
 
+	mockConfig := &configmocks.MockGenericConfig{}
+	defer mockConfig.AssertExpectations(t)
+
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	expectedMessage := "test message"
+	expectedKey := "test-key"
+	expectedValue := "test-value"
 
 	mockLogger.EXPECT().
 		Info(expectedMessage).
+		Once()
+
+	mockConfig.EXPECT().
+		Get(expectedKey).
+		Return(expectedValue, nil).
 		Once()
 
 	type TestDependencies struct{}
@@ -28,14 +43,21 @@ func TestDependenciesProvider_toInternal_HappyPath(t *testing.T) {
 
 	provider := server.DependenciesProvider[*TestDependencies](func(resources server.DependenciesProviderResources) (*TestDependencies, error) {
 		resources.Logger().Info(expectedMessage)
+
+		result, err := resources.Config().Get(expectedKey, "")
+		require.NoError(t, err)
+		assert.Equal(t, expectedValue, result)
+
 		return expectedDependencies, nil
 	})
 
 	// Act
 	internalProvider := provider.ToInternal()
-	dependencies, err := internalProvider(definition.DependenciesProviderResources{
-		Logger: mockLogger,
-	})
+	dependencies, err := internalProvider(definition.NewDependenciesProviderResources(
+		mockLogger,
+		mockConfig,
+		mockMessageCatalog,
+	))
 
 	// Assert
 	require.NoError(t, err)

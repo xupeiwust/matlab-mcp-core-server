@@ -21,6 +21,8 @@ var messages_en_US = messageMap{
 	StartupErrors_BadFlag:                                   `Error with supplied arguments: non-existent option %[1]s.%[2]s%[3]s`,
 	StartupErrors_BadSyntax:                                 `Error with supplied arguments: invalid syntax %[1]s.%[2]s%[3]s`,
 	StartupErrors_BadValue:                                  `Error with supplied arguments: invalid value %[1]s for option %[2]s.`,
+	StartupErrors_BadValueForEnvVar:                         `Error with supplied environment variable: invalid value %[1]s for environment variable %[2]s.`,
+	StartupErrors_DuplicateParameter:                        `Found duplicate parameter "%[1]s": %[2]s with value "%[3]s" is already defined.`,
 	StartupErrors_FailedToCreateDirectory:                   `Failed to create directory "%[1]s".`,
 	StartupErrors_FailedToCreateFile:                        `Failed to create file "%[1]s".`,
 	StartupErrors_FailedToCreateLogFile:                     `Failed to create the log file "%[1]s".`,
@@ -30,6 +32,8 @@ var messages_en_US = messageMap{
 	StartupErrors_GenericInitializeFailure:                  `Failed to initialize MCP Core Server. Error: %[1]s.`,
 	StartupErrors_InvalidDisplayMode:                        `Error with supplied arguments: invalid display mode %[1]s.`,
 	StartupErrors_InvalidLogLevel:                           `Error with supplied arguments: invalid log level %[1]s.`,
+	StartupErrors_InvalidParameterKey:                       `Invalid key "%[1]s" in configuration.`,
+	StartupErrors_InvalidParameterType:                      `Invalid type for key "%[1]s" in configuration, expected "%[2]s".`,
 	StartupErrors_MissingValue:                              `Error with supplied arguments: value required for option %[1]s.`,
 	StartupErrors_ParseFailed:                               `Error with supplied arguments: parse failed.%[1]s%[2]s`,
 }

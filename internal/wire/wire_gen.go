@@ -10,6 +10,7 @@ import (
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/config"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/definition"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/directory"
+	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/inputs/defaultparameters"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/inputs/parser"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/lifecyclesignaler"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/modeselector"
@@ -52,6 +53,7 @@ import (
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/os"
 	watchdog2 "github.com/matlab/matlab-mcp-core-server/internal/adaptors/watchdog"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/watchdog/process"
+	"github.com/matlab/matlab-mcp-core-server/internal/entities"
 	"github.com/matlab/matlab-mcp-core-server/internal/facades/filefacade"
 	"github.com/matlab/matlab-mcp-core-server/internal/facades/iofacade"
 	"github.com/matlab/matlab-mcp-core-server/internal/facades/osfacade"
@@ -75,13 +77,14 @@ import (
 // Injectors from wire.go:
 
 func Initialize(serverDefinition ApplicationDefinition) *Application {
-	messageCatalog := messagecatalog.New()
-	parserParser := parser.New(messageCatalog)
 	osFacade := osfacade.New()
-	factory := config.NewFactory(parserParser, osFacade)
+	messageCatalog := messagecatalog.New()
+	factory := defaultparameters.NewFactory(messageCatalog)
+	parserParser := parser.New(osFacade, factory, serverDefinition)
+	configFactory := config.NewFactory(parserParser, osFacade)
 	filesFactory := files.NewFactory(osFacade)
-	directoryFactory := directory.NewFactory(factory, filesFactory, osFacade)
-	loggerFactory := logger.NewFactory(factory, directoryFactory, filesFactory, osFacade)
+	directoryFactory := directory.NewFactory(configFactory, filesFactory, osFacade)
+	loggerFactory := logger.NewFactory(configFactory, directoryFactory, filesFactory, osFacade)
 	processManager := os.New(osFacade)
 	processHandler := processhandler.New(loggerFactory, processManager)
 	handlerFactory := handler.NewFactory(loggerFactory, processHandler)
@@ -90,7 +93,7 @@ func Initialize(serverDefinition ApplicationDefinition) *Application {
 	socketFactory := socket.NewFactory(directoryFactory, osFacade)
 	watchdogWatchdog := watchdog.New(loggerFactory, osFacade, processHandler, processManager, handlerFactory, factory2, socketFactory)
 	lifecycleSignaler := lifecyclesignaler.New()
-	sdkFactory := sdk.NewFactory(factory, serverDefinition)
+	sdkFactory := sdk.NewFactory(configFactory, serverDefinition)
 	fileFacade := filefacade.New()
 	getter := matlabroot.New(osFacade, fileFacade)
 	ioFacade := iofacade.New()
@@ -100,7 +103,7 @@ func Initialize(serverDefinition ApplicationDefinition) *Application {
 	factory3 := directory2.NewFactory(osFacade, directoryFactory, matlabFiles)
 	processDetails := processdetails.New(osFacade)
 	matlabProcessLauncher := processlauncher.New()
-	processFactory := process.New(osFacade, loggerFactory, directoryFactory, factory)
+	processFactory := process.New(osFacade, loggerFactory, directoryFactory, configFactory)
 	clientFactory := client.NewFactory()
 	factory4 := client2.NewFactory(osFacade, loggerFactory, clientFactory)
 	watchdog3 := watchdog2.New(processFactory, factory4, loggerFactory, socketFactory)
@@ -112,30 +115,30 @@ func Initialize(serverDefinition ApplicationDefinition) *Application {
 	usecase := listavailablematlabs.New(matlabManager)
 	tool := listavailablematlabs2.New(loggerFactory, usecase)
 	startmatlabsessionUsecase := startmatlabsession.New(matlabManager)
-	startmatlabsessionTool := startmatlabsession2.New(loggerFactory, factory, startmatlabsessionUsecase)
+	startmatlabsessionTool := startmatlabsession2.New(loggerFactory, configFactory, startmatlabsessionUsecase)
 	stopmatlabsessionUsecase := stopmatlabsession.New(matlabManager)
 	stopmatlabsessionTool := stopmatlabsession2.New(loggerFactory, stopmatlabsessionUsecase)
 	pathValidator := pathvalidator.New(osFacade)
 	evalmatlabcodeUsecase := evalmatlabcode.New(pathValidator)
-	evalmatlabcodeTool := evalmatlabcode2.New(loggerFactory, factory, evalmatlabcodeUsecase, matlabManager)
-	matlabRootSelector := matlabrootselector.New(factory, matlabManager)
-	matlabStartingDirSelector := matlabstartingdirselector.New(factory, osFacade)
-	globalMATLAB := globalmatlab.New(matlabManager, matlabRootSelector, matlabStartingDirSelector, factory)
-	tool2 := evalmatlabcode3.New(loggerFactory, factory, evalmatlabcodeUsecase, globalMATLAB)
+	evalmatlabcodeTool := evalmatlabcode2.New(loggerFactory, configFactory, evalmatlabcodeUsecase, matlabManager)
+	matlabRootSelector := matlabrootselector.New(configFactory, matlabManager)
+	matlabStartingDirSelector := matlabstartingdirselector.New(configFactory, osFacade)
+	globalMATLAB := globalmatlab.New(matlabManager, matlabRootSelector, matlabStartingDirSelector, configFactory)
+	tool2 := evalmatlabcode3.New(loggerFactory, configFactory, evalmatlabcodeUsecase, globalMATLAB)
 	checkmatlabcodeUsecase := checkmatlabcode.New(pathValidator)
 	checkmatlabcodeTool := checkmatlabcode2.New(loggerFactory, checkmatlabcodeUsecase, globalMATLAB)
 	detectmatlabtoolboxesUsecase := detectmatlabtoolboxes.New()
 	detectmatlabtoolboxesTool := detectmatlabtoolboxes2.New(loggerFactory, detectmatlabtoolboxesUsecase, globalMATLAB)
 	runmatlabfileUsecase := runmatlabfile.New(pathValidator)
-	runmatlabfileTool := runmatlabfile2.New(loggerFactory, factory, runmatlabfileUsecase, globalMATLAB)
+	runmatlabfileTool := runmatlabfile2.New(loggerFactory, configFactory, runmatlabfileUsecase, globalMATLAB)
 	runmatlabtestfileUsecase := runmatlabtestfile.New(pathValidator)
 	runmatlabtestfileTool := runmatlabtestfile2.New(loggerFactory, runmatlabtestfileUsecase, globalMATLAB)
 	resource := codingguidelines.New(loggerFactory)
 	plaintextlivecodegenerationResource := plaintextlivecodegeneration.New(loggerFactory)
-	configuratorConfigurator := configurator.New(factory, tool, startmatlabsessionTool, stopmatlabsessionTool, evalmatlabcodeTool, tool2, checkmatlabcodeTool, detectmatlabtoolboxesTool, runmatlabfileTool, runmatlabtestfileTool, resource, plaintextlivecodegenerationResource)
+	configuratorConfigurator := configurator.New(configFactory, tool, startmatlabsessionTool, stopmatlabsessionTool, evalmatlabcodeTool, tool2, checkmatlabcodeTool, detectmatlabtoolboxesTool, runmatlabfileTool, runmatlabtestfileTool, resource, plaintextlivecodegenerationResource)
 	serverServer := server3.New(sdkFactory, loggerFactory, lifecycleSignaler, configuratorConfigurator)
-	orchestratorOrchestrator := orchestrator.New(lifecycleSignaler, serverDefinition, factory, serverServer, watchdog3, loggerFactory, processManager, globalMATLAB, directoryFactory)
-	modeSelector := modeselector.New(factory, parserParser, watchdogWatchdog, orchestratorOrchestrator, osFacade)
+	orchestratorOrchestrator := orchestrator.New(messageCatalog, lifecycleSignaler, serverDefinition, configFactory, serverServer, watchdog3, loggerFactory, processManager, globalMATLAB, directoryFactory)
+	modeSelector := modeselector.New(configFactory, parserParser, watchdogWatchdog, orchestratorOrchestrator, osFacade)
 	application := &Application{
 		ModeSelector:      modeSelector,
 		MessageCatalog:    messageCatalog,
@@ -160,6 +163,7 @@ type ApplicationDefinition interface {
 	Name() string
 	Title() string
 	Instructions() string
+	Parameters() []entities.Parameter
 	Dependencies(resources definition.DependenciesProviderResources) (any, error)
 	Tools(resources definition.ToolsProviderResources) []tools.Tool
 }

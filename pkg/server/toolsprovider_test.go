@@ -7,6 +7,8 @@ import (
 
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/definition"
 	internaltools "github.com/matlab/matlab-mcp-core-server/internal/adaptors/mcp/tools"
+	configmocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/application/config"
+	definitionmocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/application/definition"
 	internaltoolsmocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/mcp/tools"
 	basetoolmocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/mcp/tools/basetool"
 	entitiesmocks "github.com/matlab/matlab-mcp-core-server/mocks/entities"
@@ -20,6 +22,12 @@ func TestToolsProvider_toInternal_HappyPath(t *testing.T) {
 	mockLogger := &entitiesmocks.MockLogger{}
 	defer mockLogger.AssertExpectations(t)
 
+	mockConfig := &configmocks.MockGenericConfig{}
+	defer mockConfig.AssertExpectations(t)
+
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	mockLoggerFactory := &basetoolmocks.MockLoggerFactory{}
 	defer mockLoggerFactory.AssertExpectations(t)
 
@@ -30,9 +38,16 @@ func TestToolsProvider_toInternal_HappyPath(t *testing.T) {
 	defer mockInternalTool.AssertExpectations(t)
 
 	expectedMessage := "test message"
+	expectedKey := "test-key"
+	expectedValue := "test-value"
 
 	mockLogger.EXPECT().
 		Info(expectedMessage).
+		Once()
+
+	mockConfig.EXPECT().
+		Get(expectedKey).
+		Return(expectedValue, nil).
 		Once()
 
 	type TestDependencies struct{}
@@ -40,6 +55,11 @@ func TestToolsProvider_toInternal_HappyPath(t *testing.T) {
 
 	provider := server.ToolsProvider[*TestDependencies](func(resources server.ToolsProviderResources[*TestDependencies]) []server.Tool {
 		resources.Logger().Info(expectedMessage)
+
+		result, err := resources.Config().Get(expectedKey, "")
+		require.NoError(t, err)
+		assert.Equal(t, expectedValue, result)
+
 		assert.Equal(t, expectedDependencies, resources.Dependencies())
 		return []server.Tool{mockTool}
 	})
@@ -50,11 +70,13 @@ func TestToolsProvider_toInternal_HappyPath(t *testing.T) {
 
 	// Act
 	internalProvider := provider.ToInternal()
-	tools := internalProvider(definition.ToolsProviderResources{
-		Dependencies:  expectedDependencies,
-		LoggerFactory: mockLoggerFactory,
-		Logger:        mockLogger,
-	})
+	tools := internalProvider(definition.NewToolsProviderResources(
+		mockLogger,
+		mockConfig,
+		mockMessageCatalog,
+		expectedDependencies,
+		mockLoggerFactory,
+	))
 
 	// Assert
 	require.Equal(t, []internaltools.Tool{mockInternalTool}, tools)
@@ -77,6 +99,12 @@ func TestToolsProvider_toInternal_DependenciesCastFailure(t *testing.T) {
 	mockLogger := &entitiesmocks.MockLogger{}
 	defer mockLogger.AssertExpectations(t)
 
+	mockConfig := &configmocks.MockGenericConfig{}
+	defer mockConfig.AssertExpectations(t)
+
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	mockLoggerFactory := &basetoolmocks.MockLoggerFactory{}
 	defer mockLoggerFactory.AssertExpectations(t)
 
@@ -89,11 +117,13 @@ func TestToolsProvider_toInternal_DependenciesCastFailure(t *testing.T) {
 
 	// Act
 	internalProvider := provider.ToInternal()
-	tools := internalProvider(definition.ToolsProviderResources{
-		Dependencies:  "wrong type", // not *TestDependencies
-		LoggerFactory: mockLoggerFactory,
-		Logger:        mockLogger,
-	})
+	tools := internalProvider(definition.NewToolsProviderResources(
+		mockLogger,
+		mockConfig,
+		mockMessageCatalog,
+		"wrong type", // not *TestDependencies
+		mockLoggerFactory,
+	))
 
 	// Assert
 	require.Empty(t, tools)

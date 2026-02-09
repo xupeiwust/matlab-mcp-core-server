@@ -7,6 +7,7 @@ package mocks
 import (
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/definition"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/mcp/tools"
+	"github.com/matlab/matlab-mcp-core-server/internal/entities"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -183,6 +184,52 @@ func (_c *MockApplicationDefinition_Name_Call) Return(s string) *MockApplication
 }
 
 func (_c *MockApplicationDefinition_Name_Call) RunAndReturn(run func() string) *MockApplicationDefinition_Name_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Parameters provides a mock function for the type MockApplicationDefinition
+func (_mock *MockApplicationDefinition) Parameters() []entities.Parameter {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Parameters")
+	}
+
+	var r0 []entities.Parameter
+	if returnFunc, ok := ret.Get(0).(func() []entities.Parameter); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]entities.Parameter)
+		}
+	}
+	return r0
+}
+
+// MockApplicationDefinition_Parameters_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Parameters'
+type MockApplicationDefinition_Parameters_Call struct {
+	*mock.Call
+}
+
+// Parameters is a helper method to define mock.On call
+func (_e *MockApplicationDefinition_Expecter) Parameters() *MockApplicationDefinition_Parameters_Call {
+	return &MockApplicationDefinition_Parameters_Call{Call: _e.mock.On("Parameters")}
+}
+
+func (_c *MockApplicationDefinition_Parameters_Call) Run(run func()) *MockApplicationDefinition_Parameters_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockApplicationDefinition_Parameters_Call) Return(parameters []entities.Parameter) *MockApplicationDefinition_Parameters_Call {
+	_c.Call.Return(parameters)
+	return _c
+}
+
+func (_c *MockApplicationDefinition_Parameters_Call) RunAndReturn(run func() []entities.Parameter) *MockApplicationDefinition_Parameters_Call {
 	_c.Call.Return(run)
 	return _c
 }

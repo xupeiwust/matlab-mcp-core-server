@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/definition"
 	"github.com/matlab/matlab-mcp-core-server/internal/entities"
@@ -13,10 +14,23 @@ import (
 	"github.com/matlab/matlab-mcp-core-server/internal/wire/adaptor"
 )
 
+type Parameter interface {
+	GetID() string
+	GetFlagName() string
+	GetHiddenFlag() bool
+	GetEnvVarName() string
+	GetDescription() string
+	GetDefaultValue() any
+
+	GetRecordToLog() bool
+}
+
 type Definition[Dependencies any] struct {
 	Name         string
 	Title        string
 	Instructions string
+
+	Parameters Parameters
 
 	DependenciesProvider DependenciesProvider[Dependencies]
 
@@ -31,6 +45,9 @@ type Server[Dependencies any] struct {
 }
 
 func New[Dependencies any](thisDefinition Definition[Dependencies]) *Server[Dependencies] {
+	// Cloning parameters to avoid unexpected mutations
+	thisDefinition.Parameters = slices.Clone(thisDefinition.Parameters)
+
 	return &Server[Dependencies]{
 		applicationFactory: adaptor.NewFactory(),
 
@@ -44,6 +61,7 @@ func (s *Server[Dependencies]) StartAndWaitForCompletion(ctx context.Context) in
 		s.serverDefinition.Name,
 		s.serverDefinition.Title,
 		s.serverDefinition.Instructions,
+		s.serverDefinition.Parameters.ToInternal(),
 		s.serverDefinition.DependenciesProvider.toInternal(),
 		s.serverDefinition.ToolsProvider.toInternal(),
 	)
@@ -62,4 +80,20 @@ func (s *Server[Dependencies]) StartAndWaitForCompletion(ctx context.Context) in
 	}
 
 	return 0
+}
+
+type Parameters []Parameter
+
+func (p Parameters) ToInternal() []entities.Parameter {
+	if len(p) == 0 {
+		return nil
+	}
+
+	internalParameters := make([]entities.Parameter, len(p))
+
+	for i, parameter := range p {
+		internalParameters[i] = parameter
+	}
+
+	return internalParameters
 }

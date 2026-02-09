@@ -5,6 +5,7 @@ package adaptor
 import (
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/definition"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/mcp/tools"
+	"github.com/matlab/matlab-mcp-core-server/internal/entities"
 	"github.com/matlab/matlab-mcp-core-server/internal/wire"
 )
 
@@ -12,6 +13,7 @@ type ApplicationDefinition interface {
 	Name() string
 	Title() string
 	Instructions() string
+	Parameters() []entities.Parameter
 	Dependencies(resources definition.DependenciesProviderResources) (any, error)
 	Tools(resources definition.ToolsProviderResources) []tools.Tool
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/matlab/matlab-mcp-core-server/internal/messages"
 	"github.com/matlab/matlab-mcp-core-server/internal/testutils"
 	configmocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/application/config"
+	definitionmocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/application/definition"
 	directorymocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/application/directory"
 	orchestratormocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/application/orchestrator"
 	toolsmocks "github.com/matlab/matlab-mcp-core-server/mocks/adaptors/mcp/tools"
@@ -49,8 +50,12 @@ func TestNew_HappyPath(t *testing.T) {
 	mockDirectoryFactory := &orchestratormocks.MockDirectoryFactory{}
 	defer mockDirectoryFactory.AssertExpectations(t)
 
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	//Act
 	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
 		mockLifecycleSignaler,
 		mockApplicationDefinition,
 		mockConfigFactory,
@@ -95,6 +100,9 @@ func TestOrchestrator_StartAndWaitForCompletion_ConfigError(t *testing.T) {
 	mockDirectoryFactory := &orchestratormocks.MockDirectoryFactory{}
 	defer mockDirectoryFactory.AssertExpectations(t)
 
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	ctx := t.Context()
 	expectedError := messages.AnError
 
@@ -104,6 +112,7 @@ func TestOrchestrator_StartAndWaitForCompletion_ConfigError(t *testing.T) {
 		Once()
 
 	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
 		mockLifecycleSignaler,
 		mockApplicationDefinition,
 		mockConfigFactory,
@@ -154,6 +163,9 @@ func TestOrchestrator_StartAndWaitForCompletion_GetGlobalLoggerError(t *testing.
 	mockDirectoryFactory := &orchestratormocks.MockDirectoryFactory{}
 	defer mockDirectoryFactory.AssertExpectations(t)
 
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	ctx := t.Context()
 	expectedError := messages.AnError
 
@@ -168,6 +180,7 @@ func TestOrchestrator_StartAndWaitForCompletion_GetGlobalLoggerError(t *testing.
 		Once()
 
 	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
 		mockLifecycleSignaler,
 		mockApplicationDefinition,
 		mockConfigFactory,
@@ -218,6 +231,9 @@ func TestOrchestrator_StartAndWaitForCompletion_DirectoryError(t *testing.T) {
 	mockDirectoryFactory := &orchestratormocks.MockDirectoryFactory{}
 	defer mockDirectoryFactory.AssertExpectations(t)
 
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	mockLogger := testutils.NewInspectableLogger()
 	ctx := t.Context()
 	expectedError := messages.AnError
@@ -258,6 +274,7 @@ func TestOrchestrator_StartAndWaitForCompletion_DirectoryError(t *testing.T) {
 		Once()
 
 	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
 		mockLifecycleSignaler,
 		mockApplicationDefinition,
 		mockConfigFactory,
@@ -311,6 +328,9 @@ func TestOrchestrator_StartAndWaitForCompletion_WatchdogStartError(t *testing.T)
 	mockDirectory := &directorymocks.MockDirectory{}
 	defer mockDirectory.AssertExpectations(t)
 
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	mockLogger := testutils.NewInspectableLogger()
 	ctx := t.Context()
 	expectedError := messages.AnError
@@ -361,6 +381,7 @@ func TestOrchestrator_StartAndWaitForCompletion_WatchdogStartError(t *testing.T)
 		Once()
 
 	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
 		mockLifecycleSignaler,
 		mockApplicationDefinition,
 		mockConfigFactory,
@@ -414,10 +435,13 @@ func TestOrchestrator_StartAndWaitForCompletion_DependenciesError(t *testing.T) 
 	mockDirectory := &directorymocks.MockDirectory{}
 	defer mockDirectory.AssertExpectations(t)
 
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	mockLogger := testutils.NewInspectableLogger()
 	ctx := t.Context()
 	expectedError := assert.AnError
-	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger)
+	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger, mockConfig, mockMessageCatalog)
 
 	mockConfigFactory.EXPECT().
 		Config().
@@ -470,6 +494,7 @@ func TestOrchestrator_StartAndWaitForCompletion_DependenciesError(t *testing.T) 
 		Once()
 
 	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
 		mockLifecycleSignaler,
 		mockApplicationDefinition,
 		mockConfigFactory,
@@ -526,6 +551,9 @@ func TestOrchestrator_StartAndWaitForCompletion_HappyPath(t *testing.T) {
 	mockTool := &toolsmocks.MockTool{}
 	defer mockTool.AssertExpectations(t)
 
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	mockLogger := testutils.NewInspectableLogger()
 	ctx := t.Context()
 	interruptC := getInterruptChannel()
@@ -534,8 +562,8 @@ func TestOrchestrator_StartAndWaitForCompletion_HappyPath(t *testing.T) {
 	defer close(stopServer)
 
 	expectedDependencies := &struct{}{}
-	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger)
-	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, expectedDependencies, mockLoggerFactory)
+	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger, mockConfig, mockMessageCatalog)
+	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, mockConfig, mockMessageCatalog, expectedDependencies, mockLoggerFactory)
 	expectedTools := []tools.Tool{mockTool}
 
 	mockLoggerFactory.EXPECT().
@@ -624,6 +652,7 @@ func TestOrchestrator_StartAndWaitForCompletion_HappyPath(t *testing.T) {
 		Once()
 
 	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
 		mockLifecycleSignaler,
 		mockApplicationDefinition,
 		mockConfigFactory,
@@ -686,11 +715,14 @@ func TestOrchestrator_StartAndWaitForCompletion_InitializeMATLABOnStartup_False(
 	mockDirectory := &directorymocks.MockDirectory{}
 	defer mockDirectory.AssertExpectations(t)
 
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	ctx := t.Context()
 	interruptC := getInterruptChannel()
 	var expectedDependencies any
-	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger)
-	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, expectedDependencies, mockLoggerFactory)
+	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger, mockConfig, mockMessageCatalog)
+	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, mockConfig, mockMessageCatalog, expectedDependencies, mockLoggerFactory)
 	var expectedTools []tools.Tool
 
 	mockLoggerFactory.EXPECT().
@@ -777,6 +809,7 @@ func TestOrchestrator_StartAndWaitForCompletion_InitializeMATLABOnStartup_False(
 		Once()
 
 	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
 		mockLifecycleSignaler,
 		mockApplicationDefinition,
 		mockConfigFactory,
@@ -836,13 +869,16 @@ func TestOrchestrator_StartAndWaitForCompletion_ServerError(t *testing.T) {
 	mockDirectory := &directorymocks.MockDirectory{}
 	defer mockDirectory.AssertExpectations(t)
 
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	mockLogger := testutils.NewInspectableLogger()
 	ctx := t.Context()
 	interruptC := getInterruptChannel()
 	expectedError := assert.AnError
 	var expectedDependencies any
-	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger)
-	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, expectedDependencies, mockLoggerFactory)
+	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger, mockConfig, mockMessageCatalog)
+	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, mockConfig, mockMessageCatalog, expectedDependencies, mockLoggerFactory)
 	var expectedTools []tools.Tool
 
 	mockLoggerFactory.EXPECT().
@@ -926,6 +962,7 @@ func TestOrchestrator_StartAndWaitForCompletion_ServerError(t *testing.T) {
 		Once()
 
 	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
 		mockLifecycleSignaler,
 		mockApplicationDefinition,
 		mockConfigFactory,
@@ -979,14 +1016,17 @@ func TestOrchestrator_StartAndWaitForCompletion_InitializeMATLABErrorDoesNotTrig
 	mockDirectory := &directorymocks.MockDirectory{}
 	defer mockDirectory.AssertExpectations(t)
 
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	mockLogger := testutils.NewInspectableLogger()
 	ctx := t.Context()
 	expectedError := assert.AnError
 	closeServerRoutine := make(chan struct{})
 	isShutdownCalled := make(chan struct{})
 	var expectedDependencies any
-	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger)
-	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, expectedDependencies, mockLoggerFactory)
+	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger, mockConfig, mockMessageCatalog)
+	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, mockConfig, mockMessageCatalog, expectedDependencies, mockLoggerFactory)
 	var expectedTools []tools.Tool
 
 	mockLoggerFactory.EXPECT().
@@ -1076,6 +1116,7 @@ func TestOrchestrator_StartAndWaitForCompletion_InitializeMATLABErrorDoesNotTrig
 		Once()
 
 	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
 		mockLifecycleSignaler,
 		mockApplicationDefinition,
 		mockConfigFactory,
@@ -1140,13 +1181,16 @@ func TestOrchestrator_StartAndWaitForCompletion_WaitForShutdownToCompleteError(t
 	mockDirectory := &directorymocks.MockDirectory{}
 	defer mockDirectory.AssertExpectations(t)
 
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	mockLogger := testutils.NewInspectableLogger()
 	ctx := t.Context()
 	interruptC := getInterruptChannel()
 	expectedError := assert.AnError
 	var expectedDependencies any
-	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger)
-	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, expectedDependencies, mockLoggerFactory)
+	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger, mockConfig, mockMessageCatalog)
+	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, mockConfig, mockMessageCatalog, expectedDependencies, mockLoggerFactory)
 	var expectedTools []tools.Tool
 
 	mockLoggerFactory.EXPECT().
@@ -1230,6 +1274,7 @@ func TestOrchestrator_StartAndWaitForCompletion_WaitForShutdownToCompleteError(t
 		Once()
 
 	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
 		mockLifecycleSignaler,
 		mockApplicationDefinition,
 		mockConfigFactory,
@@ -1301,12 +1346,15 @@ func TestOrchestrator_StartAndWaitForCompletion_WatchdogStopError(t *testing.T) 
 	mockDirectory := &directorymocks.MockDirectory{}
 	defer mockDirectory.AssertExpectations(t)
 
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	ctx := t.Context()
 	interruptC := getInterruptChannel()
 	expectedError := assert.AnError
 	var expectedDependencies any
-	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger)
-	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, expectedDependencies, mockLoggerFactory)
+	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger, mockConfig, mockMessageCatalog)
+	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, mockConfig, mockMessageCatalog, expectedDependencies, mockLoggerFactory)
 	var expectedTools []tools.Tool
 
 	mockLoggerFactory.EXPECT().
@@ -1401,6 +1449,7 @@ func TestOrchestrator_StartAndWaitForCompletion_WatchdogStopError(t *testing.T) 
 		Once()
 
 	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
 		mockLifecycleSignaler,
 		mockApplicationDefinition,
 		mockConfigFactory,
@@ -1467,12 +1516,15 @@ func TestOrchestrator_StartAndWaitForCompletion_MultipleSession_HappyPath(t *tes
 	mockDirectory := &directorymocks.MockDirectory{}
 	defer mockDirectory.AssertExpectations(t)
 
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
 	mockLogger := testutils.NewInspectableLogger()
 	ctx := t.Context()
 	interruptC := getInterruptChannel()
 	var expectedDependencies any
-	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger)
-	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, expectedDependencies, mockLoggerFactory)
+	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger, mockConfig, mockMessageCatalog)
+	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, mockConfig, mockMessageCatalog, expectedDependencies, mockLoggerFactory)
 	var expectedTools []tools.Tool
 
 	mockLoggerFactory.EXPECT().
@@ -1546,6 +1598,7 @@ func TestOrchestrator_StartAndWaitForCompletion_MultipleSession_HappyPath(t *tes
 		Once()
 
 	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
 		mockLifecycleSignaler,
 		mockApplicationDefinition,
 		mockConfigFactory,

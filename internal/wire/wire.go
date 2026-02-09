@@ -9,6 +9,7 @@ import (
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/config"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/definition"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/directory"
+	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/inputs/defaultparameters"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/inputs/parser"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/lifecyclesignaler"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/modeselector"
@@ -86,6 +87,7 @@ type ApplicationDefinition interface {
 	Name() string
 	Title() string
 	Instructions() string
+	Parameters() []entities.Parameter
 	Dependencies(resources definition.DependenciesProviderResources) (any, error)
 	Tools(resources definition.ToolsProviderResources) []tools.Tool
 }
@@ -125,6 +127,7 @@ func Initialize(serverDefinition ApplicationDefinition) *Application {
 
 		// Orchestrator
 		orchestrator.New,
+		wire.Bind(new(orchestrator.MessageCatalog), new(*messagecatalog.MessageCatalog)),
 		wire.Bind(new(orchestrator.LifecycleSignaler), new(*lifecyclesignaler.LifecycleSignaler)),
 		wire.Bind(new(orchestrator.ApplicationDefinition), new(ApplicationDefinition)),
 		wire.Bind(new(orchestrator.ConfigFactory), new(*config.Factory)),
@@ -349,12 +352,18 @@ func Initialize(serverDefinition ApplicationDefinition) *Application {
 
 		// Config Factory
 		config.NewFactory,
-		wire.Bind(new(config.OSLayer), new(*osfacade.OsFacade)),
 		wire.Bind(new(config.Parser), new(*parser.Parser)),
+		wire.Bind(new(config.OSLayer), new(*osfacade.OsFacade)),
 
 		// Parser
 		parser.New,
-		wire.Bind(new(parser.MessageCatalog), new(*messagecatalog.MessageCatalog)),
+		wire.Bind(new(parser.OSLayer), new(*osfacade.OsFacade)),
+		wire.Bind(new(parser.DefaultParameterFactory), new(*defaultparameters.Factory)),
+		wire.Bind(new(parser.ParameterFactory), new(ApplicationDefinition)),
+
+		// Default Parameters
+		defaultparameters.NewFactory,
+		wire.Bind(new(defaultparameters.MessageCatalog), new(*messagecatalog.MessageCatalog)),
 
 		// Message Catalog
 		messagecatalog.New,

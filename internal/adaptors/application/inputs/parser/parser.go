@@ -3,231 +3,144 @@
 package parser
 
 import (
-	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
-	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/inputs/flags"
 	"github.com/matlab/matlab-mcp-core-server/internal/entities"
 	"github.com/matlab/matlab-mcp-core-server/internal/messages"
 	"github.com/spf13/pflag"
 )
 
-type MessageCatalog interface {
-	Get(message messages.MessageKey) string
+type DefaultParameterFactory interface {
+	DefaultParameters() []entities.Parameter
 }
 
-type SpecifiedArguments struct {
-	VersionMode                      bool
-	HelpMode                         bool
-	DisableTelemetry                 bool
-	UseSingleMATLABSession           bool
-	LogLevel                         entities.LogLevel
-	PreferredLocalMATLABRoot         string
-	PreferredMATLABStartingDirectory string
-	BaseDirectory                    string
-	WatchdogMode                     bool
-	ServerInstanceID                 string
-	InitializeMATLABOnStartup        bool
-	DisplayMode                      entities.DisplayMode
+type ParameterFactory interface {
+	Parameters() []entities.Parameter
+}
+
+type OSLayer interface {
+	LookupEnv(key string) (string, bool)
 }
 
 type Parser struct {
+	osLayer                 OSLayer
+	defaultParameterFactory DefaultParameterFactory
+	parameterFactory        ParameterFactory
+
+	flagSet         *pflag.FlagSet
+	parameters      []entities.Parameter
+	flagToParameter map[string]entities.Parameter
+
+	once      sync.Once
 	usageText string
-	flagSet   *pflag.FlagSet
+	initErr   messages.Error
 }
 
-func New(messageCatalog MessageCatalog) *Parser {
-	flagSet := pflag.NewFlagSet(pflag.CommandLine.Name(), pflag.ContinueOnError)
-	setupFlags(messageCatalog, flagSet)
-	usageText := generateUsageText(flagSet)
-	return &Parser{flagSet: flagSet, usageText: usageText}
+func New(
+	osLayer OSLayer,
+	defaultParameterFactory DefaultParameterFactory,
+	parameterFactory ParameterFactory,
+) *Parser {
+	return &Parser{
+		osLayer:                 osLayer,
+		defaultParameterFactory: defaultParameterFactory,
+		parameterFactory:        parameterFactory,
+	}
 }
 
-func (p *Parser) Usage() string {
-	return p.usageText
+func (p *Parser) Usage() (string, messages.Error) {
+	if err := p.initialize(); err != nil {
+		return "", err
+	}
+
+	return p.usageText, nil
 }
 
-func (p *Parser) Parse(args []string) (SpecifiedArguments, messages.Error) {
-	err := p.flagSet.Parse(args)
-	if err != nil {
-		return SpecifiedArguments{}, p.convertToUserFacingError(err)
+func (p *Parser) Parse(args []string) ([]entities.Parameter, map[string]any, messages.Error) {
+	if err := p.initialize(); err != nil {
+		return nil, nil, err
 	}
 
-	helpMode, err := p.flagSet.GetBool(flags.HelpMode)
-	if err != nil {
-		return SpecifiedArguments{}, p.convertToUserFacingError(err)
+	specifiedArgs := make(map[string]any)
+	for _, param := range p.parameters {
+		specifiedArgs[param.GetID()] = param.GetDefaultValue()
 	}
 
-	versionMode, err := p.flagSet.GetBool(flags.VersionMode)
-	if err != nil {
-		return SpecifiedArguments{}, p.convertToUserFacingError(err)
+	if err := p.parseEnvVars(specifiedArgs); err != nil {
+		return nil, nil, err
 	}
 
-	disableTelemetry, err := p.flagSet.GetBool(flags.DisableTelemetry)
-	if err != nil {
-		return SpecifiedArguments{}, p.convertToUserFacingError(err)
+	if err := p.parseFlags(args, specifiedArgs); err != nil {
+		return nil, nil, err
 	}
 
-	useSingleMATLABSession, err := p.flagSet.GetBool(flags.UseSingleMATLABSession)
-	if err != nil {
-		return SpecifiedArguments{}, p.convertToUserFacingError(err)
-	}
-
-	logLevel, err := p.flagSet.GetString(flags.LogLevel)
-	if err != nil {
-		return SpecifiedArguments{}, p.convertToUserFacingError(err)
-	}
-
-	switch logLevel {
-	case string(entities.LogLevelDebug), string(entities.LogLevelInfo), string(entities.LogLevelWarn), string(entities.LogLevelError):
-		break
-	default:
-		return SpecifiedArguments{}, messages.New_StartupErrors_InvalidLogLevel_Error(logLevel)
-	}
-
-	preferredLocalMATLABRoot, err := p.flagSet.GetString(flags.PreferredLocalMATLABRoot)
-	if err != nil {
-		return SpecifiedArguments{}, p.convertToUserFacingError(err)
-	}
-
-	preferredMATLABStartingDirectory, err := p.flagSet.GetString(flags.PreferredMATLABStartingDirectory)
-	if err != nil {
-		return SpecifiedArguments{}, p.convertToUserFacingError(err)
-	}
-
-	baseDir, err := p.flagSet.GetString(flags.BaseDir)
-	if err != nil {
-		return SpecifiedArguments{}, p.convertToUserFacingError(err)
-	}
-
-	watchdogMode, err := p.flagSet.GetBool(flags.WatchdogMode)
-	if err != nil {
-		return SpecifiedArguments{}, p.convertToUserFacingError(err)
-	}
-
-	serverInstanceID, err := p.flagSet.GetString(flags.ServerInstanceID)
-	if err != nil {
-		return SpecifiedArguments{}, p.convertToUserFacingError(err)
-	}
-
-	initializeMATLABOnStartup, err := p.flagSet.GetBool(flags.InitializeMATLABOnStartup)
-	if err != nil {
-		return SpecifiedArguments{}, p.convertToUserFacingError(err)
-	}
-
-	if !useSingleMATLABSession {
-		initializeMATLABOnStartup = false
-	}
-
-	displayMode, err := p.flagSet.GetString(flags.DisplayMode)
-	if err != nil {
-		return SpecifiedArguments{}, p.convertToUserFacingError(err)
-	}
-
-	switch displayMode {
-	case string(entities.DisplayModeDesktop), string(entities.DisplayModeNoDesktop):
-		break
-	default:
-		return SpecifiedArguments{}, messages.New_StartupErrors_InvalidDisplayMode_Error(displayMode)
-	}
-
-	return SpecifiedArguments{
-		VersionMode:                      versionMode,
-		HelpMode:                         helpMode,
-		DisableTelemetry:                 disableTelemetry,
-		UseSingleMATLABSession:           useSingleMATLABSession,
-		LogLevel:                         entities.LogLevel(logLevel),
-		PreferredLocalMATLABRoot:         preferredLocalMATLABRoot,
-		PreferredMATLABStartingDirectory: preferredMATLABStartingDirectory,
-		BaseDirectory:                    baseDir,
-		WatchdogMode:                     watchdogMode,
-		ServerInstanceID:                 serverInstanceID,
-		InitializeMATLABOnStartup:        initializeMATLABOnStartup,
-		DisplayMode:                      entities.DisplayMode(displayMode),
-	}, nil
+	return p.parameters, specifiedArgs, nil
 }
 
-func setHiddenBoolFlag(flagSet *pflag.FlagSet, flagName string, flagDefaultValue bool, flagDescription string) {
-	flagSet.Bool(flagName, flagDefaultValue, flagDescription)
-	//nolint:errcheck,gosec // Logically impossible to hit NotExistError
-	flagSet.MarkHidden(flagName)
+func (p *Parser) initialize() messages.Error {
+	p.once.Do(func() {
+		allParameters, err := p.allParameters()
+		if err != nil {
+			p.initErr = err
+			return
+		}
+
+		p.parameters = allParameters
+		p.flagToParameter = make(map[string]entities.Parameter)
+		for _, param := range allParameters {
+			if flagName := param.GetFlagName(); flagName != "" {
+				p.flagToParameter[flagName] = param
+			}
+		}
+
+		p.flagSet = pflag.NewFlagSet(pflag.CommandLine.Name(), pflag.ContinueOnError)
+		p.setupFlags()
+		p.generateUsageText()
+	})
+	return p.initErr
 }
 
-func setHiddenStringFlag(flagSet *pflag.FlagSet, flagName string, flagDefaultValue string, flagDescription string) {
-	flagSet.String(flagName, flagDefaultValue, flagDescription)
-	//nolint:errcheck,gosec // Logically impossible to hit NotExistError
-	flagSet.MarkHidden(flagName)
-}
+func (p *Parser) allParameters() ([]entities.Parameter, messages.Error) {
+	allParams := append(p.defaultParameterFactory.DefaultParameters(), p.parameterFactory.Parameters()...)
 
-func setupFlags(messageCatalog MessageCatalog, flagSet *pflag.FlagSet) {
-	flagSet.Bool(flags.HelpMode, flags.HelpModeDefaultValue,
-		messageCatalog.Get(messages.CLIMessages_HelpDescription),
-	)
+	seenIDs := make(map[string]struct{})
+	seenFlags := make(map[string]struct{})
+	seenEnvVars := make(map[string]struct{})
 
-	flagSet.Bool(flags.VersionMode, flags.VersionModeDefaultValue,
-		messageCatalog.Get(messages.CLIMessages_VersionDescription),
-	)
+	for _, param := range allParams {
+		id := param.GetID()
+		if id == "" {
+			return nil, messages.New_StartupErrors_InvalidParameterKey_Error(id)
+		}
 
-	flagSet.Bool(flags.DisableTelemetry, flags.DisableTelemetryDefaultValue,
-		messageCatalog.Get(messages.CLIMessages_DisableTelemetryDescription),
-	)
+		if _, ok := seenIDs[id]; ok {
+			return nil, messages.New_StartupErrors_DuplicateParameter_Error(id, "parameter ID", id)
+		}
+		seenIDs[id] = struct{}{}
 
-	flagSet.String(flags.LogLevel, flags.LogLevelDefaultValue,
-		messageCatalog.Get(messages.CLIMessages_LogLevelDescription),
-	)
+		flag := param.GetFlagName()
+		if flag != "" {
+			if _, ok := seenFlags[flag]; ok {
+				return nil, messages.New_StartupErrors_DuplicateParameter_Error(id, "flag name", flag)
+			}
+			seenFlags[flag] = struct{}{}
+		}
 
-	flagSet.String(flags.PreferredLocalMATLABRoot, flags.PreferredLocalMATLABRootDefaultValue,
-		messageCatalog.Get(messages.CLIMessages_PreferredLocalMATLABRootDescription),
-	)
-
-	flagSet.String(flags.PreferredMATLABStartingDirectory, flags.PreferredMATLABStartingDirectoryDefaultValue,
-		messageCatalog.Get(messages.CLIMessages_PreferredMATLABStartingDirectoryDescription),
-	)
-
-	flagSet.String(flags.BaseDir, flags.BaseDirDefaultValue,
-		messageCatalog.Get(messages.CLIMessages_BaseDirDescription),
-	)
-
-	flagSet.Bool(flags.InitializeMATLABOnStartup, flags.InitializeMATLABOnStartupDefaultValue,
-		messageCatalog.Get(messages.CLIMessages_InitializeMATLABOnStartupDescription),
-	)
-
-	flagSet.String(flags.DisplayMode, flags.DisplayModeDefaultValue,
-		messageCatalog.Get(messages.CLIMessages_DisplayModeDescription),
-	)
-
-	// Hidden flags, for internal use only
-	setHiddenBoolFlag(flagSet, flags.UseSingleMATLABSession, flags.UseSingleMATLABSessionDefaultValue,
-		messageCatalog.Get(messages.CLIMessages_UseSingleMATLABSessionDescription))
-
-	setHiddenBoolFlag(flagSet, flags.WatchdogMode, flags.WatchdogModeDefaultValue,
-		messageCatalog.Get(messages.CLIMessages_InternalUseDescription))
-
-	setHiddenStringFlag(flagSet, flags.ServerInstanceID, flags.ServerInstanceIDDefaultValue,
-		messageCatalog.Get(messages.CLIMessages_InternalUseDescription))
-}
-
-func (p *Parser) convertToUserFacingError(err error) messages.Error {
-	var notExistError *pflag.NotExistError
-	var invalidSyntaxError *pflag.InvalidSyntaxError
-	var invalidValueError *pflag.InvalidValueError
-	var valueRequiredError *pflag.ValueRequiredError
-
-	switch {
-	case errors.As(err, &notExistError):
-		return messages.New_StartupErrors_BadFlag_Error(notExistError.GetSpecifiedName(), "\n", p.usageText)
-	case errors.As(err, &invalidSyntaxError):
-		return messages.New_StartupErrors_BadSyntax_Error(invalidSyntaxError.GetSpecifiedFlag(), "\n", p.usageText)
-	case errors.As(err, &invalidValueError):
-		return messages.New_StartupErrors_BadValue_Error(invalidValueError.GetValue(), invalidValueError.GetFlag().Name)
-	case errors.As(err, &valueRequiredError):
-		return messages.New_StartupErrors_MissingValue_Error(valueRequiredError.GetSpecifiedName())
+		envVar := strings.ToUpper(param.GetEnvVarName())
+		if envVar != "" {
+			if _, ok := seenEnvVars[envVar]; ok {
+				return nil, messages.New_StartupErrors_DuplicateParameter_Error(id, "env var name", envVar)
+			}
+			seenEnvVars[envVar] = struct{}{}
+		}
 	}
-	return messages.New_StartupErrors_ParseFailed_Error("\n", p.usageText)
+
+	return allParams, nil
 }
 
-func generateUsageText(flagSet *pflag.FlagSet) string {
+func (p *Parser) generateUsageText() {
 	usageText := fmt.Sprintf("%s\n", "Usage:")
 
 	// Determine max flag length
@@ -235,7 +148,7 @@ func generateUsageText(flagSet *pflag.FlagSet) string {
 	prePadding := 6
 	postPadding := 2
 
-	flagSet.VisitAll(func(f *pflag.Flag) {
+	p.flagSet.VisitAll(func(f *pflag.Flag) {
 		if f.Hidden {
 			return
 		}
@@ -244,12 +157,13 @@ func generateUsageText(flagSet *pflag.FlagSet) string {
 		}
 	})
 
-	flagSet.VisitAll(func(f *pflag.Flag) {
+	p.flagSet.VisitAll(func(f *pflag.Flag) {
 		if f.Hidden {
 			return
 		}
 		padding := maxFlagLength + postPadding + 2 - len(f.Name)
 		usageText += fmt.Sprintf("%s--%s%s%s\n", strings.Repeat(" ", prePadding), f.Name, strings.Repeat(" ", padding), f.Usage)
 	})
-	return usageText
+
+	p.usageText = usageText
 }
