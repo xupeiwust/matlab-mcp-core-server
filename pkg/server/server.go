@@ -30,6 +30,8 @@ type Definition[Dependencies any] struct {
 	Title        string
 	Instructions string
 
+	Features Features
+
 	Parameters Parameters
 
 	DependenciesProvider DependenciesProvider[Dependencies]
@@ -61,6 +63,7 @@ func (s *Server[Dependencies]) StartAndWaitForCompletion(ctx context.Context) in
 		s.serverDefinition.Name,
 		s.serverDefinition.Title,
 		s.serverDefinition.Instructions,
+		s.serverDefinition.Features.toInternal(),
 		s.serverDefinition.Parameters.ToInternal(),
 		s.serverDefinition.DependenciesProvider.toInternal(),
 		s.serverDefinition.ToolsProvider.toInternal(),

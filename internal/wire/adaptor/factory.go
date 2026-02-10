@@ -13,6 +13,7 @@ type ApplicationDefinition interface {
 	Name() string
 	Title() string
 	Instructions() string
+	Features() definition.Features
 	Parameters() []entities.Parameter
 	Dependencies(resources definition.DependenciesProviderResources) (any, error)
 	Tools(resources definition.ToolsProviderResources) []tools.Tool

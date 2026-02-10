@@ -87,6 +87,7 @@ type ApplicationDefinition interface {
 	Name() string
 	Title() string
 	Instructions() string
+	Features() definition.Features
 	Parameters() []entities.Parameter
 	Dependencies(resources definition.DependenciesProviderResources) (any, error)
 	Tools(resources definition.ToolsProviderResources) []tools.Tool
@@ -153,6 +154,7 @@ func Initialize(serverDefinition ApplicationDefinition) *Application {
 		// MCP Server Configurator
 		configurator.New,
 		wire.Bind(new(configurator.ConfigFactory), new(*config.Factory)),
+		wire.Bind(new(configurator.ApplicationDefinition), new(ApplicationDefinition)),
 
 		// Tools
 		wire.Bind(new(basetool.LoggerFactory), new(*logger.Factory)),

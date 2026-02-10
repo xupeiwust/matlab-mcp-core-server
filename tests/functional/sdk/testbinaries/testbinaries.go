@@ -64,6 +64,19 @@ func BuildServerWithCustomTools(t *testing.T) ServerDetails {
 	}
 }
 
+func BuildServerWithMATLABFeature(t *testing.T) ServerDetails {
+	// Those string literals match the one in the source code
+	return ServerDetails{
+		binaryLocation: buildSDKServer(t, "server_with_matlab_feature"),
+
+		moduleName: goModName,
+
+		name:         "server-with-matlab-feature",
+		title:        "Server With MATLAB Feature",
+		instructions: "This is a test server with MATLAB feature",
+	}
+}
+
 func BuildServerWithCustomDependencies(t *testing.T) ServerDetails {
 	// Those string literals match the one in the source code
 	return ServerDetails{

@@ -25,6 +25,7 @@ type LifecycleSignaler interface {
 }
 
 type ApplicationDefinition interface {
+	Features() definition.Features
 	Dependencies(resources definition.DependenciesProviderResources) (any, error)
 	Tools(resources definition.ToolsProviderResources) []tools.Tool
 }
@@ -167,7 +168,8 @@ func (o *Orchestrator) StartAndWaitForCompletion(ctx context.Context) error {
 		serverErrC <- o.server.Run(tools)
 	}()
 
-	if config.UseSingleMATLABSession() && config.InitializeMATLABOnStartup() {
+	matlabFeature := o.applicationDefinition.Features().MATLAB
+	if matlabFeature.Enabled && config.UseSingleMATLABSession() && config.InitializeMATLABOnStartup() {
 		_, err := o.globalMATLAB.Client(ctx, logger)
 		if err != nil {
 			logger.WithError(err).Warn("MATLAB global initialization failed")

@@ -616,6 +616,11 @@ func TestOrchestrator_StartAndWaitForCompletion_HappyPath(t *testing.T) {
 		}).
 		Once()
 
+	mockApplicationDefinition.EXPECT().
+		Features().
+		Return(definition.Features{MATLAB: definition.MATLABFeature{Enabled: true}}).
+		Once()
+
 	mockConfig.EXPECT().
 		UseSingleMATLABSession().
 		Return(true).
@@ -778,6 +783,11 @@ func TestOrchestrator_StartAndWaitForCompletion_InitializeMATLABOnStartup_False(
 		}).
 		Once()
 
+	mockApplicationDefinition.EXPECT().
+		Features().
+		Return(definition.Features{MATLAB: definition.MATLABFeature{Enabled: true}}).
+		Once()
+
 	mockConfig.EXPECT().
 		UseSingleMATLABSession().
 		Return(true).
@@ -834,6 +844,160 @@ func TestOrchestrator_StartAndWaitForCompletion_InitializeMATLABOnStartup_False(
 	require.NoError(t, <-errC)
 }
 
+func TestOrchestrator_StartAndWaitForCompletion_MATLABFeatureDisabled(t *testing.T) {
+	// Arrange
+	mockLogger := testutils.NewInspectableLogger()
+
+	mockLifecycleSignaler := &orchestratormocks.MockLifecycleSignaler{}
+	defer mockLifecycleSignaler.AssertExpectations(t)
+
+	mockApplicationDefinition := &orchestratormocks.MockApplicationDefinition{}
+	defer mockApplicationDefinition.AssertExpectations(t)
+
+	mockConfigFactory := &orchestratormocks.MockConfigFactory{}
+	defer mockConfigFactory.AssertExpectations(t)
+
+	mockConfig := &configmocks.MockConfig{}
+	defer mockConfig.AssertExpectations(t)
+
+	mockServer := &orchestratormocks.MockServer{}
+	defer mockServer.AssertExpectations(t)
+
+	mockWatchdogClient := &orchestratormocks.MockWatchdogClient{}
+	defer mockWatchdogClient.AssertExpectations(t)
+
+	mockLoggerFactory := &orchestratormocks.MockLoggerFactory{}
+	defer mockLoggerFactory.AssertExpectations(t)
+
+	mockSignalLayer := &orchestratormocks.MockOSSignaler{}
+	defer mockSignalLayer.AssertExpectations(t)
+
+	mockGlobalMATLABManager := &orchestratormocks.MockGlobalMATLAB{}
+	defer mockGlobalMATLABManager.AssertExpectations(t)
+
+	mockDirectoryFactory := &orchestratormocks.MockDirectoryFactory{}
+	defer mockDirectoryFactory.AssertExpectations(t)
+
+	mockDirectory := &directorymocks.MockDirectory{}
+	defer mockDirectory.AssertExpectations(t)
+
+	mockMessageCatalog := &definitionmocks.MockMessageCatalog{}
+	defer mockMessageCatalog.AssertExpectations(t)
+
+	ctx := t.Context()
+	interruptC := getInterruptChannel()
+	var expectedDependencies any
+	expectedDependenciesProviderResources := definition.NewDependenciesProviderResources(mockLogger, mockConfig, mockMessageCatalog)
+	expectedToolProviderResources := definition.NewToolsProviderResources(mockLogger, mockConfig, mockMessageCatalog, expectedDependencies, mockLoggerFactory)
+	var expectedTools []tools.Tool
+
+	mockLoggerFactory.EXPECT().
+		GetGlobalLogger().
+		Return(mockLogger, nil).
+		Once()
+
+	mockConfigFactory.EXPECT().
+		Config().
+		Return(mockConfig, nil).
+		Once()
+
+	mockConfig.EXPECT().
+		RecordToLogger(mockLogger.AsMockArg()).
+		Return().
+		Once()
+
+	mockDirectoryFactory.EXPECT().
+		Directory().
+		Return(mockDirectory, nil).
+		Once()
+
+	mockDirectory.EXPECT().
+		RecordToLogger(mockLogger.AsMockArg()).
+		Return().
+		Once()
+
+	mockWatchdogClient.EXPECT().
+		Start().
+		Return(nil).
+		Once()
+
+	mockApplicationDefinition.EXPECT().
+		Dependencies(expectedDependenciesProviderResources).
+		Return(expectedDependencies, nil).
+		Once()
+
+	mockApplicationDefinition.EXPECT().
+		Tools(expectedToolProviderResources).
+		Return(expectedTools).
+		Once()
+
+	serverStarted := make(chan struct{})
+	stopServer := make(chan struct{})
+	defer close(stopServer)
+
+	mockServer.EXPECT().
+		Run(expectedTools).
+		RunAndReturn(func(_ []tools.Tool) error {
+			close(serverStarted)
+			<-stopServer
+			return nil
+		}).
+		Once()
+
+	mockApplicationDefinition.EXPECT().
+		Features().
+		Return(definition.Features{MATLAB: definition.MATLABFeature{Enabled: false}}).
+		Once()
+
+	mockSignalLayer.EXPECT().
+		InterruptSignalChan().
+		Return(interruptC).
+		Once()
+
+	mockLifecycleSignaler.EXPECT().
+		RequestShutdown().
+		Return().
+		Once()
+
+	mockLifecycleSignaler.EXPECT().
+		WaitForShutdownToComplete().
+		Return(nil).
+		Once()
+
+	mockWatchdogClient.EXPECT().
+		Stop().
+		Return(nil).
+		Once()
+
+	orchestratorInstance := orchestrator.New(
+		mockMessageCatalog,
+		mockLifecycleSignaler,
+		mockApplicationDefinition,
+		mockConfigFactory,
+		mockServer,
+		mockWatchdogClient,
+		mockLoggerFactory,
+		mockSignalLayer,
+		mockGlobalMATLABManager,
+		mockDirectoryFactory,
+	)
+
+	// Act
+	errC := make(chan error)
+	go func() {
+		errC <- orchestratorInstance.StartAndWaitForCompletion(ctx)
+	}()
+
+	<-serverStarted
+
+	sendInterruptSignal(interruptC)
+
+	// Assert
+	require.NoError(t, <-errC, "StartAndWaitForCompletion should not return an error on signal interrupt")
+	// Assertions are verified via deferred mock expectations.
+	// mockGlobalMATLABManager.Client is NOT called because MATLAB feature is disabled.
+}
+
 func TestOrchestrator_StartAndWaitForCompletion_ServerError(t *testing.T) {
 	// Arrange
 	mockLifecycleSignaler := &orchestratormocks.MockLifecycleSignaler{}
@@ -858,7 +1022,7 @@ func TestOrchestrator_StartAndWaitForCompletion_ServerError(t *testing.T) {
 	defer mockLoggerFactory.AssertExpectations(t)
 
 	mockSignalLayer := &orchestratormocks.MockOSSignaler{}
-	defer mockLoggerFactory.AssertExpectations(t)
+	defer mockSignalLayer.AssertExpectations(t)
 
 	mockGlobalMATLABManager := &orchestratormocks.MockGlobalMATLAB{}
 	defer mockGlobalMATLABManager.AssertExpectations(t)
@@ -924,6 +1088,11 @@ func TestOrchestrator_StartAndWaitForCompletion_ServerError(t *testing.T) {
 	mockServer.EXPECT().
 		Run(expectedTools).
 		Return(expectedError).
+		Once()
+
+	mockApplicationDefinition.EXPECT().
+		Features().
+		Return(definition.Features{MATLAB: definition.MATLABFeature{Enabled: true}}).
 		Once()
 
 	mockConfig.EXPECT().
@@ -1077,6 +1246,11 @@ func TestOrchestrator_StartAndWaitForCompletion_InitializeMATLABErrorDoesNotTrig
 		}).
 		Once()
 
+	mockApplicationDefinition.EXPECT().
+		Features().
+		Return(definition.Features{MATLAB: definition.MATLABFeature{Enabled: true}}).
+		Once()
+
 	mockConfig.EXPECT().
 		UseSingleMATLABSession().
 		Return(true).
@@ -1161,7 +1335,7 @@ func TestOrchestrator_StartAndWaitForCompletion_WaitForShutdownToCompleteError(t
 	defer mockConfig.AssertExpectations(t)
 
 	mockServer := &orchestratormocks.MockServer{}
-	defer mockConfig.AssertExpectations(t)
+	defer mockServer.AssertExpectations(t)
 
 	mockWatchdogClient := &orchestratormocks.MockWatchdogClient{}
 	defer mockWatchdogClient.AssertExpectations(t)
@@ -1170,7 +1344,7 @@ func TestOrchestrator_StartAndWaitForCompletion_WaitForShutdownToCompleteError(t
 	defer mockLoggerFactory.AssertExpectations(t)
 
 	mockSignalLayer := &orchestratormocks.MockOSSignaler{}
-	defer mockLoggerFactory.AssertExpectations(t)
+	defer mockSignalLayer.AssertExpectations(t)
 
 	mockGlobalMATLABManager := &orchestratormocks.MockGlobalMATLAB{}
 	defer mockGlobalMATLABManager.AssertExpectations(t)
@@ -1236,6 +1410,11 @@ func TestOrchestrator_StartAndWaitForCompletion_WaitForShutdownToCompleteError(t
 	mockServer.EXPECT().
 		Run(expectedTools).
 		Return(nil).
+		Once()
+
+	mockApplicationDefinition.EXPECT().
+		Features().
+		Return(definition.Features{MATLAB: definition.MATLABFeature{Enabled: true}}).
 		Once()
 
 	mockConfig.EXPECT().
@@ -1410,6 +1589,11 @@ func TestOrchestrator_StartAndWaitForCompletion_WatchdogStopError(t *testing.T) 
 		}).
 		Once()
 
+	mockApplicationDefinition.EXPECT().
+		Features().
+		Return(definition.Features{MATLAB: definition.MATLABFeature{Enabled: true}}).
+		Once()
+
 	mockConfig.EXPECT().
 		UseSingleMATLABSession().
 		Return(true).
@@ -1570,6 +1754,11 @@ func TestOrchestrator_StartAndWaitForCompletion_MultipleSession_HappyPath(t *tes
 	mockServer.EXPECT().
 		Run(expectedTools).
 		Return(nil).
+		Once()
+
+	mockApplicationDefinition.EXPECT().
+		Features().
+		Return(definition.Features{MATLAB: definition.MATLABFeature{Enabled: true}}).
 		Once()
 
 	mockConfig.EXPECT().

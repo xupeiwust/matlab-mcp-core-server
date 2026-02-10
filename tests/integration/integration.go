@@ -8,6 +8,6 @@ import (
 )
 
 func NewEmptyApplication() *wire.Application {
-	serverDefinition := definition.New("", "", "", nil, nil, nil)
+	serverDefinition := definition.New("", "", "", definition.Features{}, nil, nil, nil)
 	return wire.Initialize(serverDefinition)
 }

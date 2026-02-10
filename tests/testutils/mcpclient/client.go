@@ -110,6 +110,14 @@ func (s *MCPClientSession) InitializeResult() *mcp.InitializeResult {
 	return s.session.InitializeResult()
 }
 
+func (s *MCPClientSession) ListTools(ctx context.Context, params *mcp.ListToolsParams) (*mcp.ListToolsResult, error) {
+	return s.session.ListTools(ctx, params)
+}
+
+func (s *MCPClientSession) ListResources(ctx context.Context, params *mcp.ListResourcesParams) (*mcp.ListResourcesResult, error) {
+	return s.session.ListResources(ctx, params)
+}
+
 // CallTool calls an MCP tool and asserts it doesn't error
 func (s *MCPClientSession) CallTool(ctx context.Context, name string, args map[string]any) (*mcp.CallToolResult, error) {
 	result, err := s.session.CallTool(ctx, &mcp.CallToolParams{

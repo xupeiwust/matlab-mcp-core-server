@@ -27,7 +27,7 @@ func TestEmptyServerTestSuite(t *testing.T) {
 	suite.Run(t, new(EmptyServerTestSuite))
 }
 
-func (s *EmptyServerTestSuite) TestSDK_CLI_Version() {
+func (s *EmptyServerTestSuite) TestSDK_EmptyServer_Version() {
 	// Arrange
 
 	// Act
@@ -39,7 +39,7 @@ func (s *EmptyServerTestSuite) TestSDK_CLI_Version() {
 	s.Require().Contains(string(output), s.serverDetails.ModuleName(), "should display server package path")
 }
 
-func (s *EmptyServerTestSuite) TestSDK_ServerDefinition_NameTitleAndInstruction() {
+func (s *EmptyServerTestSuite) TestSDK_EmptyServer_NameTitleAndInstructionNoToolsAndNoResources() {
 	// Arrange
 	client := mcpclient.NewClient(s.T().Context(), s.serverDetails.BinaryLocation(), nil, "--log-level=debug")
 
@@ -52,9 +52,21 @@ func (s *EmptyServerTestSuite) TestSDK_ServerDefinition_NameTitleAndInstruction(
 	// Act
 	result := session.InitializeResult()
 
+	listToolsResponse, err := session.ListTools(s.T().Context(), nil)
+	s.Require().NoError(err)
+
+	listResourcesResponse, err := session.ListResources(s.T().Context(), nil)
+	s.Require().NoError(err)
+
 	// Assert
 	s.Require().NotNil(result)
-	s.Require().Equal(s.serverDetails.Name(), result.ServerInfo.Name)
-	s.Require().Equal(s.serverDetails.Title(), result.ServerInfo.Title)
-	s.Require().Equal(s.serverDetails.Instructions(), result.Instructions)
+	s.Equal(s.serverDetails.Name(), result.ServerInfo.Name)
+	s.Equal(s.serverDetails.Title(), result.ServerInfo.Title)
+	s.Equal(s.serverDetails.Instructions(), result.Instructions)
+
+	s.Require().NotNil(listToolsResponse)
+	s.Empty(listToolsResponse.Tools)
+
+	s.Require().NotNil(listResourcesResponse)
+	s.Empty(listResourcesResponse.Resources)
 }

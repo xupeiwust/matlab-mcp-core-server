@@ -17,6 +17,8 @@ type Definition struct {
 	title        string
 	instructions string
 
+	features Features
+
 	parameters []entities.Parameter
 
 	dependenciesProvider DependenciesProvider
@@ -28,6 +30,7 @@ func New(
 	name string,
 	title string,
 	instructions string,
+	features Features,
 	parameters []entities.Parameter,
 	dependenciesProvider DependenciesProvider,
 	toolsProvider ToolsProvider,
@@ -36,6 +39,8 @@ func New(
 		name:         name,
 		title:        title,
 		instructions: instructions,
+
+		features: features,
 
 		parameters: parameters,
 
@@ -55,6 +60,10 @@ func (d Definition) Title() string {
 
 func (d Definition) Instructions() string {
 	return d.instructions
+}
+
+func (d Definition) Features() Features {
+	return d.features
 }
 
 func (d Definition) Parameters() []entities.Parameter {
