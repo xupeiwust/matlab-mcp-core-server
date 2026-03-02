@@ -15,6 +15,7 @@ import (
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/orchestrator"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/parameter/defaultparameters/selector"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/parameter/parser"
+	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/buildinfo"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/filesystem/files"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/globalmatlab"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/globalmatlab/matlabrootselector"
@@ -82,7 +83,8 @@ func Initialize(serverDefinition ApplicationDefinition) *Application {
 	messageCatalog := messagecatalog.New()
 	selectorSelector := selector.New(serverDefinition, messageCatalog)
 	parserParser := parser.New(osFacade, selectorSelector, serverDefinition)
-	factory := config.NewFactory(parserParser, osFacade)
+	buildInfo := buildinfo.New(osFacade)
+	factory := config.NewFactory(parserParser, osFacade, buildInfo)
 	filesFactory := files.NewFactory(osFacade)
 	directoryFactory := directory.NewFactory(factory, filesFactory, osFacade)
 	loggerFactory := logger.NewFactory(factory, directoryFactory, filesFactory, osFacade)

@@ -14,6 +14,7 @@ import (
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/orchestrator"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/parameter/defaultparameters/selector"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/application/parameter/parser"
+	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/buildinfo"
 	files "github.com/matlab/matlab-mcp-core-server/internal/adaptors/filesystem/files"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/matlab/codeanalyzer"
 	"github.com/matlab/matlab-mcp-core-server/internal/adaptors/globalmatlab"
@@ -361,6 +362,11 @@ func Initialize(serverDefinition ApplicationDefinition) *Application {
 		config.NewFactory,
 		wire.Bind(new(config.Parser), new(*parser.Parser)),
 		wire.Bind(new(config.OSLayer), new(*osfacade.OsFacade)),
+		wire.Bind(new(config.BuildInfo), new(*buildinfo.BuildInfo)),
+
+		// BuildInfo
+		buildinfo.New,
+		wire.Bind(new(buildinfo.OSLayer), new(*osfacade.OsFacade)),
 
 		// Parser
 		parser.New,
